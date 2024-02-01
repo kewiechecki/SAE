@@ -1,0 +1,8 @@
+Python was never intended for scientific computing.
+We all know this. We suffer through it because of legacy code.
+I would like to convince you that 
+
+Imagine an ML library where a model was just a decomposable series of first-class functions.
+Imagine writing custom loss functions without deep understanding of pytorch internals.
+Imagine if *mechinterp didn't require working with hooks*.
+The library is [Flux](https://fluxml.ai/Flux.jl/stable/). The only barrier is 

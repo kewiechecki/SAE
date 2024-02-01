@@ -1,0 +1,18 @@
+function update!(M,x,y,loss::Function,opt)
+    x = gpu(x)
+    y = gpu(y)
+    f = m->loss(m(x),y)
+    state = Flux.setup(opt,M)
+    l,∇ = Flux.withgradient(f,M)
+    Flux.update!(state,M,∇[1])
+    return l
+end
+
+function train!(M,loader,opt,epochs,loss,log)
+    @showprogress map(1:epochs) do _
+         map(loader) do (x,y)
+            l = update!(M,x,y,loss,opt)
+            push!(log,l)
+        end
+    end
+end
