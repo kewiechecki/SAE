@@ -91,7 +91,7 @@ Tables.table(L_SAE) |> CSV.write(path*"L_SAE.csv")
 
 # PSAE
 
-![flowchart](https://github.com/kewiechecki/SAE/tree/master/fig/flowchart.jpg?raw=true)
+![flowchart](https://github.com/kewiechecki/SAE/blob/master/fig/flowchart.jpg?raw=true)
 
 A PSAE attempts to simultaneously learn a sparse embedding and a sparse clustering of the data.
 It is based on treating an optimal clustering as a
