@@ -26,10 +26,13 @@ function train!(M,loader,opt,epochs,loss,log)
     end
 end
 
-function train!(M::SAE,α,loader,opt,epochs,lossfn,log)
+function train!(M::Union{SAE,PSAE},α,loader,opt,epochs,lossfn,log)
     @showprogress map(1:epochs) do _
-         map(loader) do (x,y)
-            l = update!(M,loss_SAE(α,lossfn,x,y),opt)
+        map(loader) do (x,y)
+            f = loss_SAE(M_outer,α,lossfn,x)
+            state = Flux.setup(opt,sae)
+            l,∇ = Flux.withgradient(f,sae)
+            Flux.update!(state,sae,∇[1])
             push!(log,l)
         end
     end

@@ -48,3 +48,10 @@ end
 function loss_SAE(α,lossfn,x,y)
     return M->loss(M,α,lossfn,x,y)
 end
+
+function loss_SAE(M_outer,α,lossfn,x)
+    x = gpu(x)
+    yhat = M_outer(x)
+    f = M->L1(M,α,x) + L2(M,lossfn,x,yhat)
+    return m->lossfn((M_outer[2] ∘ m ∘ M_outer[1])(x),yhat)
+end
