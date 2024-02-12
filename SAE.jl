@@ -1,6 +1,8 @@
 using Flux, Functors
+abstract type SparseEncoder
+end
 
-struct SAE
+struct SAE <: SparseEncoder
     weight::AbstractArray
     bias::AbstractArray
     σ::Function
@@ -24,22 +26,37 @@ function decode(M::SAE,c)
     return M.weight' * c
 end
 
-function (M::SAE)(x)
+struct SED <: SparseEncoder
+    encoder::Chain
+    decoder::Chain
+end
+@functor SED
+
+function encode(M::SED,x)
+    return M.encoder(x)
+end
+
+function decode(M::SED,c)
+    return M.decoder(c)
+end
+
+
+function (M::SparseEncoder)(x)
     c = encode(M,x)
     x̂ =  decode(M,c)
     return x̂
 end
 
-function L1(M::SAE,α,x)
+function L1(M::SparseEncoder,α,x)
     c = encode(M,x)
     return α * sum(abs(c))
 end
 
-function L2(M::SAE,lossfn,x,y)
+function L2(M::SparseEncoder,lossfn,x,y)
     return lossfn(M(x),y)
 end
 
-function loss(M::SAE,α,lossfn,x,y)
+function loss(M::SparseEncoder,α,lossfn,x,y)
     x = gpu(x)
     y = gpu(y)
     return L1(M,α,x) + L2(M,lossfn,x,y)

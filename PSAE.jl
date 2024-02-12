@@ -1,6 +1,9 @@
 # SAE implementation using a partitoning submodel.
+using Flux, Functors
+using CUDA, LinearAlgebra
+
 struct PSAE
-    sae::SAE
+    sae::SparseEncoder
     partitioner::Chain
 end
 @functor PSAE
@@ -47,6 +50,20 @@ function loss_PSAE(M::PSAE,α,lossfn,x,y)
     x = gpu(x)
     y = gpu(y)
     return L1(M,α,x) + L2(M,lossfn,x,y)
+end
+
+function zerodiag(G::AbstractArray)
+    m, n = size(G)
+    G = G .* (1 .- I(n))
+    return G
+end
+
+# [CuArray] -> [CuArray]
+# workaround for moving identity matrix to GPU 
+function zerodiag(G::CuArray)
+    m, n = size(G)
+    G = G .* (1 .- I(n) |> gpu)
+    return G
 end
 
 # constructs weighted affinity kernel from adjacency matrix

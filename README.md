@@ -133,3 +133,15 @@ function pwak(K::AbstractMatrix; dims=1)
     return wak(P)
 end
 ```
+# Defining PSAE
+```{julia}
+include(PSAE.jl)
+# max clusters
+k = 12
+partitioner = Dense(m => k,relu)
+psae = PSAE(sae,partitioner)
+
+L_PSAE = []
+
+train!(psae,M_outer,α,loader,opt,epochs,logitcrossentropy,L_PSAE)
+```

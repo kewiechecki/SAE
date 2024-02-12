@@ -1,4 +1,5 @@
-using ProgressMeter
+using ProgressMeter, MLDatasets, OneHotArrays
+using JLD2,Tables,CSV
 
 function update!(M,x,y,loss::Function,opt)
     x = gpu(x)
@@ -17,16 +18,36 @@ function update!(M,loss::Function,opt)
     return l
 end
 
-function train!(M,loader,opt,epochs,loss,log)
-    @showprogress map(1:epochs) do _
+function savemodel(M,path)
+    state = Flux.state(M) |> cpu;
+    jldsave(path*".jld2";state)
+end
+
+function train!(M,loader,opt,epochs,loss,log;
+                ignoreY=false,savecheckpts=false,
+                path="")
+    if length(path) > 0
+        mkpath(path)
+    end
+    @showprogress map(1:epochs) do i
          map(loader) do (x,y)
+            if ignoreY
+                y = x
+            end
             l = update!(M,x,y,loss,opt)
             push!(log,l)
         end
+        if savecheckpts
+            savemodel(M,path*string(i))
+        end
+    end
+    if length(path) > 0
+        savemodel(M,path*"final")
+        Tables.table(log) |> CSV.write(path*"loss.csv")
     end
 end
 
-function train!(M::Union{SAE,PSAE},α,loader,opt,epochs,lossfn,log)
+function train!(sae::Union{SAE,PSAE},M_outer,α,loader,opt,epochs,lossfn,log)
     @showprogress map(1:epochs) do _
         map(loader) do (x,y)
             f = loss_SAE(M_outer,α,lossfn,x)
@@ -38,26 +59,3 @@ function train!(M::Union{SAE,PSAE},α,loader,opt,epochs,lossfn,log)
     end
 end
 
-function outermodel()
-    kern = (3,3)
-    s = (2,2)
-    θ_conv = Chain(Conv(kern,1 => 3,relu,stride=s),
-                Conv(kern,3 => 6,relu,stride=s),
-                Conv(kern,6 => 9,relu,stride=s),
-                Conv((2,2),9 => 12,relu))
-
-    θ_mlp = Chain(Dense(12 => 6,relu),
-                Dense(6 => m,relu))
-
-    θ_outer = Chain(θ_conv,
-                    x->reshape(x,12,:),
-                    θ_mlp)
-
-    π_outer = Chain(Dense(m => 5,relu),
-                    Dense(5 => 10,relu),
-                    softmax)
-
-    M_outer = Chain(θ_outer,π_outer)
-    return M_outer
-
-end

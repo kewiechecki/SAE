@@ -3,7 +3,10 @@
 # This forces the model to represent more than 3 features in this layer.
 # Our goal is to split the activations of this layer into linearly separable features. 
 
+include("SAE.jl")
+include("PSAE.jl")
 include("trainingfns.jl")
+include("models.jl")
 
 using MLDatasets, StatsPlots, OneHotArrays
 using Flux: logitcrossentropy
@@ -11,7 +14,7 @@ using Flux: logitcrossentropy
 using JLD2,Tables,CSV
 
 # where to write the toy model
-path = "data/MNIST/"
+path = "data/MNIST/outer/"
 
 epochs = 100
 batchsize=512
@@ -29,6 +32,7 @@ X = reshape(dat.features[:, :, :], m_x, m_y, 1, n)
 loader = Flux.DataLoader((X,target),
                          batchsize=batchsize,
                          shuffle=true)
+
 
 M_outer = outermodel() |> gpu
 
