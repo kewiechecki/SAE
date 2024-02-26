@@ -23,14 +23,14 @@ function outerclassifier(m=3)
 end
 
 function outerdec(m=3)
-    kern = (4,4)
+    kern = (3,3)
     s = (2,2)
     ϕ_mlp = Chain(Dense(m => 6,relu),
                   Dense(6 => 12,relu))
     ϕ_deconv = Chain(ConvTranspose((2,2),12 => 9,relu),
-                   ConvTranspose(kern,9 => 6,relu,stride=s),
+                   ConvTranspose((4,4),9 => 6,relu,stride=s),
                    ConvTranspose(kern,6 => 3,relu,stride=s),
-                   ConvTranspose(kern,3 => 1,relu,stride=s))
+                   ConvTranspose((4,4),3 => 1,relu,stride=s))
     ϕ = Chain(ϕ_mlp,
               x->reshape(x,1,1,12,:),
               ϕ_deconv)

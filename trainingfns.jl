@@ -2,8 +2,8 @@ using ProgressMeter, MLDatasets, OneHotArrays
 using JLD2,Tables,CSV
 
 function update!(M,x,y,loss::Function,opt)
-    x = gpu(x)
-    y = gpu(y)
+    #x = gpu(x)
+    #y = gpu(y)
     f = m->loss(m(x),y)
     state = Flux.setup(opt,M)
     l,∇ = Flux.withgradient(f,M)
@@ -24,17 +24,22 @@ function savemodel(M,path)
 end
 
 function train!(M,loader,opt,epochs,loss,log;
+                prefn = identity,postfn=identity,
                 ignoreY=false,savecheckpts=false,
                 path="")
     if length(path) > 0
         mkpath(path)
     end
+    f = (x,y)->loss(postfn(x),y)
     @showprogress map(1:epochs) do i
-         map(loader) do (x,y)
+        map(loader) do (x,y)
+            x = gpu(x)
+            y = gpu(y)
             if ignoreY
                 y = x
             end
-            l = update!(M,x,y,loss,opt)
+            x = prefn(x)
+            l = update!(M,x,y,f,opt)
             push!(log,l)
         end
         if savecheckpts
