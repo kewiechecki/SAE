@@ -1,6 +1,7 @@
 # SAE implementation using a partitoning submodel.
 using Flux, Functors
 using CUDA, LinearAlgebra
+using ProgressMeter
 
 struct PSAE
     sae::SparseEncoder
@@ -13,7 +14,7 @@ function encode(M::PSAE,X)
 end
 
 function cluster(M::PSAE,X)
-    return M.partitioner(X)
+    return (softmax ∘ M.partitioner)(X)
 end
 
 function partition(M::PSAE,X)
@@ -78,4 +79,48 @@ end
 function pwak(K::AbstractMatrix; dims=1)
     P = K' * K
     return wak(P)
+end
+
+
+function train!(sae::Union{SAE,PSAE},M_outer,α,loader,opt,
+                epochs,lossfn,log,
+                path="")
+    if length(path) > 0
+        mkpath(path)
+    end
+    @showprogress map(1:epochs) do _
+        map(loader) do (x,y)
+            f = loss_SAE(M_outer,α,lossfn,x)
+            state = Flux.setup(opt,sae)
+            l,∇ = Flux.withgradient(f,sae)
+            Flux.update!(state,sae,∇[1])
+            push!(log,l)
+        end
+    end
+    if length(path) > 0
+        savemodel(M,path*"final")
+        Tables.table(log) |> CSV.write(path*"loss.csv")
+    end
+end
+
+
+function train!(sae::Union{SAE,PSAE},M_outer,loader,opt,
+                epochs,lossfn,log,
+                path="")
+    if length(path) > 0
+        mkpath(path)
+    end
+    @showprogress map(1:epochs) do _
+        map(loader) do (x,y)
+            f = loss_SAE(M_outer,α,lossfn,x)
+            state = Flux.setup(opt,sae)
+            l,∇ = Flux.withgradient(f,sae)
+            Flux.update!(state,sae,∇[1])
+            push!(log,l)
+        end
+    end
+    if length(path) > 0
+        savemodel(M,path*"final")
+        Tables.table(log) |> CSV.write(path*"loss.csv")
+    end
 end

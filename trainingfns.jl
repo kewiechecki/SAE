@@ -30,7 +30,7 @@ function train!(M,loader,opt,epochs,loss,log;
     if length(path) > 0
         mkpath(path)
     end
-    f = (x,y)->loss(postfn(x),y)
+    f = (E,y)->loss(postfn(E),y)
     @showprogress map(1:epochs) do i
         map(loader) do (x,y)
             x = gpu(x)
@@ -38,8 +38,8 @@ function train!(M,loader,opt,epochs,loss,log;
             if ignoreY
                 y = x
             end
-            x = prefn(x)
-            l = update!(M,x,y,f,opt)
+            E = prefn(x)
+            l = update!(M,E,y,f,opt)
             push!(log,l)
         end
         if savecheckpts
@@ -51,16 +51,3 @@ function train!(M,loader,opt,epochs,loss,log;
         Tables.table(log) |> CSV.write(path*"loss.csv")
     end
 end
-
-function train!(sae::Union{SAE,PSAE},M_outer,α,loader,opt,epochs,lossfn,log)
-    @showprogress map(1:epochs) do _
-        map(loader) do (x,y)
-            f = loss_SAE(M_outer,α,lossfn,x)
-            state = Flux.setup(opt,sae)
-            l,∇ = Flux.withgradient(f,sae)
-            Flux.update!(state,sae,∇[1])
-            push!(log,l)
-        end
-    end
-end
-

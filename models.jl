@@ -72,3 +72,34 @@ function mnistloader(batchsize)
                             shuffle=true)
     return loader
 end
+
+function loadouter(m=3,path="data/MNIST/")
+    θ = outerenc(m) |> gpu
+    π = outerclassifier(m) |> gpu
+    ϕ = outerdec(m) |> gpu
+    M = Chain(θ,π)
+
+    state_M = JLD2.load(path*"outer/classifier/final.jld2","state")
+    Flux.loadmodel!(M,state_M)
+    state_ϕ = JLD2.load(path*"outer/encoder/final.jld2","state")
+    Flux.loadmodel!(ϕ,state_ϕ)
+    return θ,π,ϕ
+end
+
+function loadsae(m,d,path="data/MNIST/")
+    sae = SAE(m,d) |> gpu
+    state = JLD2.load(path*"inner/SAE/final.jld2","state")
+    Flux.loadmodel!(sae,state)
+    return sae
+end
+
+function loadpsae(m,d,path="data/MNIST/")
+    sae = SAE(m,d)
+    partitioner = Chain(Dense(m => k,relu))
+
+    psae = PSAE(sae,partitioner) |> gpu
+    state = JLD2.load(path*"inner/PSAE/final.jld2","state")
+    Flux.loadmodel!(psae,state)
+    return psae
+end
+

@@ -1,6 +1,8 @@
 include("SAE.jl")
 include("PSAE.jl")
 include("trainingfns.jl")
+include("models.jl")
+include("auxfns.jl")
 
 using MLDatasets, StatsPlots, OneHotArrays
 using Flux: logitcrossentropy
@@ -15,37 +17,27 @@ epochs = 100
 batchsize=512
 
 η = 0.001
-λ = 0.001
+λ = 0.000
 opt = Flux.Optimiser(Flux.AdamW(η),Flux.WeightDecay(λ))
+α = 0.001
 
 m = 3
 d = 27
-α = 0.001
+# max clusters
+k = 12
 
-dat = MNIST(split=:train)[:]
-target = onehotbatch(dat.targets,0:9)
-
-m_x,m_y,n = size(dat.features)
-X = reshape(dat.features[:, :, :], m_x, m_y, 1, n)
-
-loader = Flux.DataLoader((X,target),
-                         batchsize=batchsize,
-                         shuffle=true)
-#load outer model
-M_outer = outermodel() |> gpu
-state_outer = JLD2.load("data/MNIST/state_outer.jld2","state_outer");
-Flux.loadmodel!(M_outer,state_outer)
-
-function loss_SAE(M_outer,α,lossfn,x)
-    x = gpu(x)
-    yhat = M_outer(x)
-    f = M->L1(M,α,x) + L2(M,lossfn,x,yhat)
-    return m->lossfn((M_outer[2] ∘ m ∘ M_outer[1])(x),yhat)
-end
+loader = mnistloader(batchsize)
+θ,π,ϕ = loadouter(m,path)
+outer = Chain(θ,ϕ)
 
 sae = SAE(m,d) |> gpu
 L_SAE = []
-train!(sae,M_outer,α,loader,opt,epochs,logitcrossentropy,L_SAE)
+train!(sae,outer,α,loader,opt,epochs,Flux.mse,L_SAE,path*"inner/SAE/")
+
+partitioner = Chain(Dense(m => k,relu))
+psae = PSAE(sae,partitioner) |> gpu
+L_PSAE = []
+train!(psae,M_outer,α,loader,opt,epochs,Flux.mse,L_PSAE,"inner/PSAE/")
 
 state_SAE = Flux.state(sae) |> cpu;
 jldsave(path*"state_SAE.jld2";state_SAE)
@@ -64,15 +56,6 @@ p = scatter(1:length(L_SAE), L_SAE,
             legend=:none)
 savefig(p,"data/MNIST/loss_SAE.pdf")
 
-# max clusters
-k = 12
-partitioner = Chain(Dense(m => k,relu))
-
-psae = PSAE(sae,partitioner) |> gpu
-
-L_PSAE = []
-
-train!(psae,M_outer,α,loader,opt,epochs,logitcrossentropy,L_PSAE)
 
 psae_linear = PSAE(sae_linear,partitioner) |> gpu
 L_PSAElinear = []
