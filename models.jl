@@ -60,6 +60,25 @@ function outermodel()
     return M_outer
 end
 
+function trainouter(m,loader,opt,epochs,path)
+    θ = outerenc(m) |> gpu
+    ϕ = outerdec(m) |> gpu
+    π = outerclassifier(m) |> gpu
+    outerclas = Chain(θ,π)
+
+    L_π = train!(outerclas,
+                 loader,opt,epochs,logitcrossentropy;
+                 savecheckpts=true,
+                 path=path*"/classifier/");
+    L_ϕ = train!(ϕ,
+                 loader,opt,epochs,Flux.mse;
+                 prefn=outerclas[1],
+                 ignoreY=true,
+                 savecheckpts=true,
+                 path=path*"/encoder/");
+    return θ,π,ϕ,L_π,L_ϕ
+end
+
 function mnistloader(batchsize)
     dat = MNIST(split=:train)[:]
     target = onehotbatch(dat.targets,0:9)
@@ -73,6 +92,15 @@ function mnistloader(batchsize)
     return loader
 end
 
+function loader(dat,batchsize)
+    X = dat(split=:train)[:]
+    target = onehotbatch(X.targets,range(extrema(X.targets)...))
+    loader = Flux.DataLoader((X,target),
+                             batchsize=batchsize,
+                             shuffle=true)
+    return loader
+end
+
 function loadouter(m=3,path="data/MNIST/")
     θ = outerenc(m) |> gpu
     π = outerclassifier(m) |> gpu
@@ -83,23 +111,28 @@ function loadouter(m=3,path="data/MNIST/")
     Flux.loadmodel!(M,state_M)
     state_ϕ = JLD2.load(path*"outer/encoder/final.jld2","state")
     Flux.loadmodel!(ϕ,state_ϕ)
-    return θ,π,ϕ
+
+    L_π = CSV.File(path*"outer/classifier/loss.csv").Column1
+    L_ϕ = CSV.File(path*"outer/encoder/loss.csv").Column1
+    return θ,π,ϕ,L_π,L_ϕ
 end
 
-function loadsae(m,d,path="data/MNIST/")
+function loadsae(m,d,path="data/MNIST/inner/classifier/SAE/L1_L2/")
     sae = SAE(m,d) |> gpu
-    state = JLD2.load(path*"inner/SAE/final.jld2","state")
+    state = JLD2.load(path*"/final.jld2","state")
+    L = CSV.File(path*"/loss.csv").Column1
     Flux.loadmodel!(sae,state)
-    return sae
+    return sae,L
 end
 
-function loadpsae(m,d,path="data/MNIST/")
-    sae = SAE(m,d)
+function loadpsae(m,d,k,path="data/MNIST/inner/classifier/PSAE/L1_L2/")
+    psae = PSAE(m,d,k) |> gpu
     partitioner = Chain(Dense(m => k,relu))
 
     psae = PSAE(sae,partitioner) |> gpu
-    state = JLD2.load(path*"inner/PSAE/final.jld2","state")
+    state = JLD2.load(path*"/final.jld2","state")
     Flux.loadmodel!(psae,state)
-    return psae
+    L = CSV.File(path*"/loss.csv").Column1
+    return psae,L
 end
 

@@ -9,6 +9,19 @@ struct PSAE
 end
 @functor PSAE
 
+function PSAE(m::Integer,d::Integer,k::Integer,σ=relu)
+    sae = SAE(m,d,σ)
+    partitioner = Chain(Dense(m => k,σ))
+    return PSAE(sae, partitioner)
+end
+
+function PSAE(m::Integer,d::Integer,k::Integer,
+              σ_sae::Function,σ::Function)
+    sae = SAE(m,d,σ_sae)
+    partitioner = Chain(Dense(m => k,σ))
+    return PSAE(sae, partitioner)
+end
+
 function encode(M::PSAE,X)
     return encode(M.sae,X)
 end
@@ -82,8 +95,14 @@ function pwak(K::AbstractMatrix; dims=1)
 end
 
 
-function train!(sae::Union{SAE,PSAE},M_outer,α,loader,opt,
-                epochs,lossfn,log,
+function train!(sae::Union{SAE,PSAE},
+                M_outer,
+                α::AbstractFloat,
+                loader::Flux.DataLoader,
+                opt::Flux.Optimiser,
+                epochs::Integer,
+                lossfn::Function,
+                log,
                 path="")
     if length(path) > 0
         mkpath(path)
@@ -98,18 +117,23 @@ function train!(sae::Union{SAE,PSAE},M_outer,α,loader,opt,
         end
     end
     if length(path) > 0
-        savemodel(M,path*"final")
+        savemodel(sae,path*"final")
         Tables.table(log) |> CSV.write(path*"loss.csv")
     end
 end
 
-
-function train!(sae::Union{SAE,PSAE},M_outer,loader,opt,
-                epochs,lossfn,log,
+function train!(sae::Union{SAE,PSAE},
+                M_outer,
+                α::AbstractFloat,
+                loader::Flux.DataLoader,
+                opt::Flux.Optimiser,
+                epochs::Integer,
+                lossfn::Function;
                 path="")
     if length(path) > 0
         mkpath(path)
     end
+    log=[]
     @showprogress map(1:epochs) do _
         map(loader) do (x,y)
             f = loss_SAE(M_outer,α,lossfn,x)
@@ -120,7 +144,35 @@ function train!(sae::Union{SAE,PSAE},M_outer,loader,opt,
         end
     end
     if length(path) > 0
-        savemodel(M,path*"final")
-        Tables.table(log) |> CSV.write(path*"loss.csv")
+        savemodel(sae,path*"/final")
+        Tables.table(log) |> CSV.write(path*"/loss.csv")
+    end
+    return log
+end
+
+
+function train!(sae::Union{SAE,PSAE},
+                M_outer,
+                loader::Flux.DataLoader,
+                opt::Flux.Optimiser,
+                epochs::Integer,
+                lossfn::Function,
+                log,
+                path="")
+    if length(path) > 0
+        mkpath(path)
+    end
+    @showprogress map(1:epochs) do _
+        map(loader) do (x,y)
+            f = loss_SAE(M_outer,lossfn,x)
+            state = Flux.setup(opt,sae)
+            l,∇ = Flux.withgradient(f,sae)
+            Flux.update!(state,sae,∇[1])
+            push!(log,l)
+        end
+    end
+    if length(path) > 0
+        savemodel(M,path*"/final")
+        Tables.table(log) |> CSV.write(path*"/loss.csv")
     end
 end

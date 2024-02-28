@@ -1,7 +1,9 @@
 using ProgressMeter, MLDatasets, OneHotArrays
 using JLD2,Tables,CSV
 
-function update!(M,x,y,loss::Function,opt)
+function update!(M,x,y,
+                 loss::Function,
+                 opt::Flux.Optimiser)
     #x = gpu(x)
     #y = gpu(y)
     f = m->loss(m(x),y)
@@ -11,7 +13,9 @@ function update!(M,x,y,loss::Function,opt)
     return l
 end
 
-function update!(M,loss::Function,opt)
+function update!(M,
+                 loss::Function,
+                 opt::Flux.Optimiser)
     state = Flux.setup(opt,M)
     l,∇ = Flux.withgradient(loss,M)
     Flux.update!(state,M,∇[1])
@@ -23,9 +27,16 @@ function savemodel(M,path)
     jldsave(path*".jld2";state)
 end
 
-function train!(M,loader,opt,epochs,loss,log;
-                prefn = identity,postfn=identity,
-                ignoreY=false,savecheckpts=false,
+function train!(M,
+                loader::Flux.DataLoader,
+                opt::Flux.Optimiser,
+                epochs::Integer,
+                loss::Function,
+                log;
+                prefn = identity,
+                postfn=identity,
+                ignoreY=false,
+                savecheckpts=false,
                 path="")
     if length(path) > 0
         mkpath(path)
@@ -47,7 +58,18 @@ function train!(M,loader,opt,epochs,loss,log;
         end
     end
     if length(path) > 0
-        savemodel(M,path*"final")
-        Tables.table(log) |> CSV.write(path*"loss.csv")
+        savemodel(M,path*"/final")
+        Tables.table(log) |> CSV.write(path*"/loss.csv")
     end
+end
+
+function train!(M,
+                loader::Flux.DataLoader,
+                opt::Flux.Optimiser,
+                epochs::Integer,
+                loss::Function;
+                kwargs...)
+    log = []
+    train!(M,loader,opt,epochs,loss,log;kwargs...)
+    return log
 end
