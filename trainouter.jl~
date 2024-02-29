@@ -1,0 +1,32 @@
+include("SAE.jl")
+include("PSAE.jl")
+include("trainingfns.jl")
+
+using StatsPlots
+using Flux: logitcrossentropy
+
+using JLD2,Tables,CSV
+
+# where to write the toy model
+path = "data/MNIST/"
+
+epochs = 100
+batchsize = 512
+m = 3
+
+η = 0.001
+λ = 0.001
+opt = Flux.Optimiser(Flux.AdamW(η),Flux.WeightDecay(λ))
+
+loader = mnistloader(batchsize)
+
+θ = outerenc()
+ϕ = outerdec()
+π = outerclassifier()
+
+M_outerenc = Chain(θ,ϕ) |> gpu
+M_outerclassifier = Chain(θ,π) |> gpu
+
+L_outerenc = []
+
+train!(M_outer,loader,opt,epochs,logitcrossentropy,L_outer);

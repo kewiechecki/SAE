@@ -4,20 +4,17 @@ include("trainingfns.jl")
 include("models.jl")
 include("auxfns.jl")
 
-using MLDatasets, StatsPlots, OneHotArrays
-using Flux: logitcrossentropy
-
-using JLD2,Tables,CSV
 using StatsPlots
+using Flux: logitcrossentropy
 
 # where to write the toy model
 path = "data/MNIST/"
 
-epochs = 100
+epochs = 1000
 batchsize=512
 
 η = 0.001
-λ = 0.000
+λ = 0.001
 opt = Flux.Optimiser(Flux.AdamW(η),Flux.WeightDecay(λ))
 α = 0.001
 
@@ -28,11 +25,41 @@ k = 12
 
 loader = mnistloader(batchsize)
 θ,π,ϕ = loadouter(m,path)
-outer = Chain(θ,ϕ)
+
+sae = trainsae(m,d,θ,π,ϕ,α,mnist,opt,epochs,
+               path*"inner/nowd/")
+sae_wd = trainsae(m,d,θ,π,ϕ,α,mnist,opt_wd,epochs,
+                  path*"inner/wd/")
+
+psae = trainpsae(m,d,k,θ,π,ϕ,α,mnist,opt,epochs,
+                 path*"inner/nowd/")
+psae_wd = trainpsae(m,d,k,θ,π,ϕ,α,mnist,opt_wd,epochs,
+                    path*"inner/wd/")
 
 sae = SAE(m,d) |> gpu
-L_SAE = []
-train!(sae,outer,α,loader,opt,epochs,Flux.mse,L_SAE,path*"inner/SAE/")
+L_classifier = train!(sae,Chain(θ,π),α,loader,opt,epochs,
+                      logitcrossentropy;
+                      path=path*"inner/classifier/SAE/L1_L2")
+
+sae_L2 = SAE(m,d) |> gpu
+L2_classifier = train!(sae,loader,opt,epochs,
+                       logitcrossentropy;
+                       prefn=θ,postfn=π,
+                       path=path*"inner/classifier/SAE/L2")
+
+sae_enc = SAE(m,d) |> gpu
+L_encoder = train!(sae_enc,Chain(θ,ϕ),
+                   α,loader,opt,epochs,
+                   Flux.mse;
+                   path=path*"inner/encoder/SAE/L1_L2")
+
+sae_enc_L2 = SAE(m,d) |> gpu
+L2_encoder = train!(sae_enc_L2,
+                   loader,opt,epochs,
+                   Flux.mse;
+                   prefn=θ,postfn=ϕ,
+                   ignoreY=true,
+                   path=path*"inner/encoder/SAE/L2")
 
 partitioner = Chain(Dense(m => k,relu))
 psae = PSAE(sae,partitioner) |> gpu

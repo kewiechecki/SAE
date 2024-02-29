@@ -1,3 +1,5 @@
+using MLDatasets, JLD2, CSV
+
 function outerenc(m=3)
     kern = (3,3)
     s = (2,2)
@@ -15,9 +17,9 @@ function outerenc(m=3)
     return θ
 end
 
-function outerclassifier(m=3)
+function outerclassifier(m=3,k=10)
     π = Chain(Dense(m => 5,relu),
-                    Dense(5 => 10,relu),
+                    Dense(5 => k,relu),
                     softmax)
     return π
 end
@@ -60,7 +62,11 @@ function outermodel()
     return M_outer
 end
 
-function trainouter(m,loader,opt,epochs,path)
+function trainouter(m::Integer,
+                    loader::Flux.DataLoader,
+                    opt::Flux.Optimiser,
+                    epochs::Integer,
+                    path)
     θ = outerenc(m) |> gpu
     ϕ = outerdec(m) |> gpu
     π = outerclassifier(m) |> gpu
@@ -76,10 +82,86 @@ function trainouter(m,loader,opt,epochs,path)
                  ignoreY=true,
                  savecheckpts=true,
                  path=path*"/encoder/");
+
     return θ,π,ϕ,L_π,L_ϕ
 end
 
-function mnistloader(batchsize)
+function trainsae(m::Integer,
+                  d::Integer,
+                  θ,π,ϕ,
+                  α::AbstractFloat,
+                  dat::Flux.DataLoader,
+                  opt::Flux.Optimiser,
+                  epochs::Integer,
+                  path)
+    sae = SAE(m,d) |> gpu
+    L_classifier = train!(sae,Chain(θ,π),α,dat,opt,epochs,
+                          logitcrossentropy;
+                          path=path*"/classifier/SAE/L1_L2/")
+
+    sae_L2 = SAE(m,d) |> gpu
+    L2_classifier = train!(sae_L2,dat,opt,epochs,
+                           logitcrossentropy;
+                           prefn=θ,postfn=π,
+                           ignoreY=true, savecheckpts=true,
+                           path=path*"/classifier/SAE/L2/")
+
+    sae_enc = SAE(m,d) |> gpu
+    L_encoder = train!(sae_enc,Chain(θ,ϕ),
+                       α,dat,opt,epochs,
+                       Flux.mse;
+                       path=path*"/encoder/SAE/L1_L2/")
+
+    sae_enc_L2 = SAE(m,d) |> gpu
+    L2_encoder = train!(sae_enc_L2,
+                        dat,opt,epochs,
+                        Flux.mse;
+                        prefn=θ,postfn=ϕ,
+                        ignoreY=true, savecheckpts=true,
+                        path=path*"/encoder/SAE/L2/")
+    return sae,sae_L2,sae_enc,sae_enc_L2
+end
+
+function trainpsae(m::Integer,
+                   d::Integer,
+                   k::Integer,
+                   θ,π,ϕ,
+                   α::AbstractFloat,
+                   dat::Flux.DataLoader,
+                   opt::Flux.Optimiser,
+                   epochs::Integer,
+                   path)
+    psae = PSAE(m,d,k) |> gpu
+    L_classifier = train!(psae,Chain(θ,π),α,dat,opt,epochs,
+                          logitcrossentropy;
+                          path=path*"/classifier/PSAE/L1_L2/")
+
+    psae_L2 = PSAE(m,d,k) |> gpu
+    L2_classifier = train!(psae_L2,dat,opt,epochs,
+                           logitcrossentropy;
+                           prefn=θ,postfn=π,
+                           ignoreY=true, savecheckpts=true,
+                           path=path*"/classifier/PSAE/L2/")
+
+    psae_enc = PSAE(m,d,k) |> gpu
+    L_encoder = train!(psae_enc,Chain(θ,ϕ),
+                       α,dat,opt,epochs,
+                       Flux.mse;
+                       path=path*"/encoder/PSAE/L1_L2/")
+
+    psae_enc_L2 = PSAE(m,d,k) |> gpu
+    L2_encoder = train!(psae_enc_L2,
+                        dat,opt,epochs,
+                        Flux.mse;
+                        prefn=θ,postfn=ϕ,
+                        ignoreY=true, savecheckpts=true,
+                        path=path*"/encoder/PSAE/L2/")
+    return psae,psae_L2,psae_enc,psae_enc_L2
+end
+
+
+
+function mnistloader(batchsize::Integer)
     dat = MNIST(split=:train)[:]
     target = onehotbatch(dat.targets,0:9)
 
@@ -92,7 +174,7 @@ function mnistloader(batchsize)
     return loader
 end
 
-function loader(dat,batchsize)
+function loader(dat,batchsize::Integer)
     X = dat(split=:train)[:]
     target = onehotbatch(X.targets,range(extrema(X.targets)...))
     loader = Flux.DataLoader((X,target),
@@ -107,13 +189,13 @@ function loadouter(m=3,path="data/MNIST/")
     ϕ = outerdec(m) |> gpu
     M = Chain(θ,π)
 
-    state_M = JLD2.load(path*"outer/classifier/final.jld2","state")
+    state_M = JLD2.load(path*"/classifier/final.jld2","state")
     Flux.loadmodel!(M,state_M)
-    state_ϕ = JLD2.load(path*"outer/encoder/final.jld2","state")
+    state_ϕ = JLD2.load(path*"/encoder/final.jld2","state")
     Flux.loadmodel!(ϕ,state_ϕ)
 
-    L_π = CSV.File(path*"outer/classifier/loss.csv").Column1
-    L_ϕ = CSV.File(path*"outer/encoder/loss.csv").Column1
+    L_π = CSV.File(path*"/classifier/loss.csv").Column1
+    L_ϕ = CSV.File(path*"/encoder/loss.csv").Column1
     return θ,π,ϕ,L_π,L_ϕ
 end
 

@@ -1,0 +1,12 @@
+path = "data/MNIST/"
+
+epochs = 100
+batchsize = 512
+
+η = 0.001
+λ = 0.001
+α = 0.001
+
+m = 3
+d = 27
+k = 12

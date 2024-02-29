@@ -47,7 +47,7 @@ function train!(M,
             x = gpu(x)
             y = gpu(y)
             if ignoreY
-                y = x
+                y = (postfn ∘ prefn)(x)
             end
             E = prefn(x)
             l = update!(M,E,y,f,opt)

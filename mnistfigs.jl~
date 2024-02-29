@@ -1,0 +1,20 @@
+include("SAE.jl")
+include("PSAE.jl")
+include("models.jl")
+include("auxfns.jl")
+include("Rmacros.jl")
+
+using MLDatasets, StatsPlots, OneHotArrays
+
+path = "data/MNIST/"
+batchsize=128
+
+m = 3
+d = 27
+k = 12
+
+mnist = mnistloader(batchsize)
+x,y = first(mnist) |> gpu
+labels = string.(unhot(cpu(y)))[1,:]
+
+θ,ϕ,π,L_π,L_ϕ = loadouter(m, path*"outer/nowd")

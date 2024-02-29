@@ -85,7 +85,7 @@ macro Rfn(f,argnames,args)
         do.call($f,args)
 
         """
-    enp 
+    end 
 end
 
 function clusthyper(out,cond,clust;kwargs...)

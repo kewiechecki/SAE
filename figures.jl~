@@ -1,0 +1,24 @@
+include("SAE.jl")
+include("PSAE.jl")
+include("models.jl")
+include("auxfns.jl")
+
+using MLDatasets, StatsPlots, OneHotArrays
+using Flux: logitcrossentropy
+
+using JLD2,Tables,CSV
+using StatsPlots
+
+# where to write the toy model
+path = "data/MNIST/"
+batchsize=128
+
+m = 3
+d = 27
+
+loader = mnistloader(batchsize)
+
+#load outer model
+M_outer = outermodel() |> gpu
+state_outer = JLD2.load("data/MNIST/state_outer.jld2","state_outer");
+Flux.loadmodel!(M_outer,state_outer)

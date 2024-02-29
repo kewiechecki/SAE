@@ -10,7 +10,7 @@ using Flux: logitcrossentropy
 # where to write the toy model
 path = "data/MNIST/"
 
-epochs = 100
+epochs = 1000
 batchsize=512
 
 η = 0.001
