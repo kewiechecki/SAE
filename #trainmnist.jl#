@@ -4,6 +4,9 @@ include("trainingfns.jl")
 include("models.jl")
 include("auxfns.jl")
 
+using StatsPlots
+using Flux: logitcrossentropy
+
 # where to write the toy model
 path = "data/MNIST/"
 
@@ -24,7 +27,7 @@ k = 12
 
 mnist = mnistloader(batchsize)
 
-θ,ϕ,π,L_π,L_ϕ = trainouter(m,mnist,opt,epochs,
+outer = trainouter(m,mnist,opt,epochs,
                            path*"outer/nowd/")
 
 outer_wd = trainouter(m,mnist,opt_wd,epochs,

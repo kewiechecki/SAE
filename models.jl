@@ -83,7 +83,11 @@ function trainouter(m::Integer,
                  savecheckpts=true,
                  path=path*"/encoder/");
 
-    return θ,π,ϕ,L_π,L_ϕ
+    return Dict([(:encoder,θ),
+                 (:classifier,π),
+                 (:decoder,ϕ),
+                 (:L_classifier,L_π),
+                 (:L_encoder,L_ϕ)])
 end
 
 function trainsae(m::Integer,
@@ -119,7 +123,11 @@ function trainsae(m::Integer,
                         prefn=θ,postfn=ϕ,
                         ignoreY=true, savecheckpts=true,
                         path=path*"/encoder/SAE/L2/")
-    return sae,sae_L2,sae_enc,sae_enc_L2
+
+    return Dict([(:L_classifier,sae,L_classifier),
+                 (:L2_classifier,sae_L2,L2_classifier),
+                 (:L_encoder,sae_enc,L_encoder),
+                 (:L2_encoder,sae_enc_L2,L2_encoder)])
 end
 
 function trainpsae(m::Integer,
@@ -156,7 +164,10 @@ function trainpsae(m::Integer,
                         prefn=θ,postfn=ϕ,
                         ignoreY=true, savecheckpts=true,
                         path=path*"/encoder/PSAE/L2/")
-    return psae,psae_L2,psae_enc,psae_enc_L2
+    return Dict([(:L_classifier,psae,L_classifier),
+                 (:L2_classifier,psae_L2,L2_classifier),
+                 (:L_encoder,psae_enc,L_encoder),
+                 (:L2_encoder,psae_enc_L2,L2_encoder)])
 end
 
 
